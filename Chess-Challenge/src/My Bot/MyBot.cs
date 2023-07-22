@@ -23,14 +23,15 @@ namespace ChessChallenge.Example
             Random rng = new();
 
             Move moveToPlay = allMoves[rng.Next(allMoves.Count)];
-            int depth = 4;
+            int depth = 3;
             float bestMove = float.MinValue;
 
-            foreach(Move move in allMoves)
+            // Order moves from best to worst to improve pruning performance
+            foreach (Move move in allMoves.OrderByDescending(m => CalculateMoveValue(board,m)))
             {
                 board.MakeMove(move);
 
-                float score = -MinMax(board, depth);
+                float score = -MinMax(board, depth, float.MinValue, float.MaxValue);
 
                 if (score > bestMove)
                 {
@@ -57,7 +58,7 @@ namespace ChessChallenge.Example
             return GetColorPiecevalue(board, true) - GetColorPiecevalue(board, false) * (board.IsWhiteToMove ? 1 : -1);
         }
 
-        float MinMax(Board board, int depth)
+        float MinMax(Board board, int depth, float alpha, float beta)
         {
             if(depth == 0 || board.IsInCheckmate())
             {
@@ -65,14 +66,41 @@ namespace ChessChallenge.Example
             }
 
             float max = float.NegativeInfinity;
-            foreach(Move move in board.GetLegalMoves())
+            // Order moves from best to worst to improve pruning performance
+            foreach(Move move in board.GetLegalMoves().OrderByDescending(m => CalculateMoveValue(board, m)))
             {
                 board.MakeMove(move);
-                float res = -MinMax(board, depth - 1);
-                max = Math.Max(max, res);
+                max = Math.Max(-MinMax(board, depth - 1, -beta, -alpha), max);
+                alpha = Math.Max(alpha, max);
                 board.UndoMove(move);
+                if(alpha >= beta)
+                {
+                    break;
+                }
             }
             return max;
+        }
+
+
+        bool MoveCreatesTarget(Board board, Move move)
+        {
+            board.MakeMove(move);
+            Move[] enemyMoves = board.GetLegalMoves();
+            bool isTarget = enemyMoves.Any(m => m.TargetSquare == move.TargetSquare);
+            board.UndoMove(move);
+
+            return isTarget;
+        }
+
+
+        int CalculateMoveValue(Board board, Move move)
+        {
+            Piece capturedPiece = board.GetPiece(move.TargetSquare);
+            int capturedPieceValue = pieceValues[(int)capturedPiece.PieceType];
+
+            int cost = !MoveCreatesTarget(board, move) ? 0 : pieceValues[(int)move.MovePieceType];
+
+            return capturedPieceValue - cost;
         }
     }
 }
