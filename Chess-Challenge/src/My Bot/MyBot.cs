@@ -1,8 +1,10 @@
 ﻿using ChessChallenge.API;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace ChessChallenge.Example
 {
@@ -12,76 +14,70 @@ namespace ChessChallenge.Example
     {
         // Piece values: null, pawn, knight, bishop, rook, queen, king
         int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+        int paths = 0;
 
         public Move Think(Board board, Timer timer)
         {
+            paths = 1;
             List<Move> allMoves = board.GetLegalMoves().ToList();
 
             // Pick a random move to play if nothing better is found
             Random rng = new();
+
             Move moveToPlay = allMoves[rng.Next(allMoves.Count)];
+            int depth = 3;
+            float bestMove = float.MinValue;
 
-            //Priortize Checkmates
-            Move[] checkmates = allMoves.Where(m => MoveIsCheckmate(board, m)).ToArray();
-            if (checkmates.Length > 0)
+            foreach(Move move in allMoves)
             {
-                return checkmates[0];
-            }
+                paths++;
+                board.MakeMove(move);
 
-            //Upgrade pieces to best piece only
-            Move[] promotions = allMoves.Where(m => m.IsPromotion).OrderByDescending(m => pieceValues[(int)m.PromotionPieceType]).ToArray();
-            if (promotions.Length > 0)
-            {
-                return promotions[0];
-            }
+                float score = MinMax(board, depth, !board.IsWhiteToMove);
 
-            IOrderedEnumerable<Move> rankedMoves = allMoves
-                        .Where(m => !checkmates.Contains(m) && !promotions.Contains(m) && CalculateMoveValue(board, m) > 0)
-                        .OrderByDescending(m => CalculateMoveValue(board, m));
-
-            if (rankedMoves.Count() > 0)
-            {
-                moveToPlay = rankedMoves.First();
+                if (score > bestMove)
+                {
+                    moveToPlay = move;
+                    bestMove = score;
+                }
+                board.UndoMove(move);
             }
-            else
-            {
-                //move pawn up you ass
-                Move[] pawnMoves = allMoves.Where(m => m.MovePieceType == PieceType.Pawn && !MoveCreatesTarget(board, m)).ToArray();
-                if(pawnMoves.Length > 0)
-                    moveToPlay= pawnMoves[rng.Next(pawnMoves.Length)];
-            }
-            
+            Console.WriteLine(paths);
             return  moveToPlay;
         }
-
-        // Test if this move gives checkmate
-        bool MoveIsCheckmate(Board board, Move move)
+       
+        int GetPiecevalue(PieceType pieceType)
         {
-            board.MakeMove(move);
-            bool isMate = board.IsInCheckmate();
-            board.UndoMove(move);
-            return isMate;
+            return pieceValues[(int)pieceType];
         }
 
-        bool MoveCreatesTarget(Board board, Move move)
+        int GetColorPiecevalue(Board board, bool isWhite)
         {
-            board.MakeMove(move);
-            Move[] enemyMoves = board.GetLegalMoves();
-            bool isTarget = enemyMoves.Any(m => m.TargetSquare == move.TargetSquare);
-            board.UndoMove(move);
-
-            return isTarget;
+            return board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == isWhite).Select(pl => pl.Count * GetPiecevalue(pl.TypeOfPieceInList)).Sum();
         }
 
-
-        int CalculateMoveValue(Board board, Move move)
+        float CalculateBoardValue(Board board) 
         {
-            Piece capturedPiece = board.GetPiece(move.TargetSquare);
-            int capturedPieceValue = pieceValues[(int)capturedPiece.PieceType];
+            return GetColorPiecevalue(board, true) - GetColorPiecevalue(board, false);
+        }
 
-            int cost = !MoveCreatesTarget(board, move) ? 0 : pieceValues[(int)move.MovePieceType];
+        float MinMax(Board board, int depth)
+        {
+            paths++;
+            if(depth == 0 || board.IsInCheckmate())
+            {
+                return CalculateBoardValue(board);
+            }
 
-            return capturedPieceValue - cost;
+            float max = float.NegativeInfinity;
+            foreach(Move move in board.GetLegalMoves())
+            {
+                board.MakeMove(move);
+                float res = -MinMax(board, depth - 1);
+                max = Math.Max(max, res);
+                board.UndoMove(move);
+            }
+            return max;
         }
     }
 }
