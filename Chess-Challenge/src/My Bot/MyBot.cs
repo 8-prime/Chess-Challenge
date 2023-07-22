@@ -14,26 +14,23 @@ namespace ChessChallenge.Example
     {
         // Piece values: null, pawn, knight, bishop, rook, queen, king
         int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
-        int paths = 0;
 
         public Move Think(Board board, Timer timer)
         {
-            paths = 1;
             List<Move> allMoves = board.GetLegalMoves().ToList();
 
             // Pick a random move to play if nothing better is found
             Random rng = new();
 
             Move moveToPlay = allMoves[rng.Next(allMoves.Count)];
-            int depth = 3;
+            int depth = 4;
             float bestMove = float.MinValue;
 
             foreach(Move move in allMoves)
             {
-                paths++;
                 board.MakeMove(move);
 
-                float score = MinMax(board, depth, !board.IsWhiteToMove);
+                float score = -MinMax(board, depth);
 
                 if (score > bestMove)
                 {
@@ -42,7 +39,6 @@ namespace ChessChallenge.Example
                 }
                 board.UndoMove(move);
             }
-            Console.WriteLine(paths);
             return  moveToPlay;
         }
        
@@ -58,12 +54,11 @@ namespace ChessChallenge.Example
 
         float CalculateBoardValue(Board board) 
         {
-            return GetColorPiecevalue(board, true) - GetColorPiecevalue(board, false);
+            return GetColorPiecevalue(board, true) - GetColorPiecevalue(board, false) * (board.IsWhiteToMove ? 1 : -1);
         }
 
         float MinMax(Board board, int depth)
         {
-            paths++;
             if(depth == 0 || board.IsInCheckmate())
             {
                 return CalculateBoardValue(board);
