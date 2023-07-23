@@ -24,8 +24,9 @@ namespace ChessChallenge.Example
 
             Move moveToPlay = allMoves[rng.Next(allMoves.Count)];
             int depth = 3;
-            if(board.GetAllPieceLists().Sum(p => p.Count) < 10)
+            if(board.GetAllPieceLists().Sum(p => p.Count) < 15)
             {
+                Console.WriteLine("Searching with increased depth");
                 depth = 5;
             }
             float bestMove = float.MinValue;
@@ -33,25 +34,17 @@ namespace ChessChallenge.Example
             //Priortize Checkmates
             Move[] checkmates = allMoves.Where(m => MoveIsCheckmate(board, m)).ToArray();
             if (checkmates.Length > 0)
-            {
                 return checkmates[0];
-            }
 
             //Upgrade pieces to best piece only
-            Move[] promotions = allMoves.Where(m => m.IsPromotion).OrderByDescending(m => pieceValues[(int)m.PromotionPieceType]).ToArray();
+            Move[] promotions = allMoves.Where(m => m.IsPromotion).OrderByDescending(m => GetPiecevalue(m.PromotionPieceType)).ToArray();
             if (promotions.Length > 0)
-            {
                 return promotions[0];
-            }
 
             //Prioritize Checks
             Move[] checks = allMoves.Where(m => MoveIsCheck(board, m) && !MoveCreatesTarget(board, m)).ToArray();
             if (checks.Length > 0)
-            {
                 return checks[rng.Next(checks.Length)];
-            }
-
-
 
             // Order moves from best to worst to improve pruning performance
             foreach (Move move in allMoves.OrderByDescending(m => CalculateMoveValue(board,m)))
@@ -88,9 +81,7 @@ namespace ChessChallenge.Example
         float MinMax(Board board, int depth, float alpha, float beta)
         {
             if(depth == 0 || board.IsInCheckmate())
-            {
                 return CalculateBoardValue(board);
-            }
 
             float max = float.NegativeInfinity;
             // Order moves from best to worst to improve pruning performance
@@ -101,9 +92,7 @@ namespace ChessChallenge.Example
                 alpha = Math.Max(alpha, max);
                 board.UndoMove(move);
                 if(alpha >= beta)
-                {
                     break;
-                }
             }
             return max;
         }
