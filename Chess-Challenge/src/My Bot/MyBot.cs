@@ -26,7 +26,7 @@ namespace ChessChallenge.Example
 
             Move moveToPlay = allMoves[rng.Next(allMoves.Count)];
             int depth = 3;
-            if (board.GetAllPieceLists().Sum(p => p.Count) < 20)
+            if (board.GetAllPieceLists().Sum(p => p.Count) < 15)
             {
                 Console.WriteLine("Searching with increased depth");
                 depth = 5;
