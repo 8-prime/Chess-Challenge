@@ -14,9 +14,11 @@ namespace ChessChallenge.Example
     {
         // Piece values: null, pawn, knight, bishop, rook, queen, king
         int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+        int paths = 0;
 
         public Move Think(Board board, Timer timer)
         {
+            paths = 0;
             List<Move> allMoves = board.GetLegalMoves().ToList();
 
             // Pick a random move to play if nothing better is found
@@ -24,12 +26,11 @@ namespace ChessChallenge.Example
 
             Move moveToPlay = allMoves[rng.Next(allMoves.Count)];
             int depth = 3;
-            if(board.GetAllPieceLists().Sum(p => p.Count) < 15)
+            if(board.GetAllPieceLists().Sum(p => p.Count) < 20)
             {
                 Console.WriteLine("Searching with increased depth");
                 depth = 5;
             }
-            float bestMove = float.MinValue;
 
             //Priortize Checkmates
             Move[] checkmates = allMoves.Where(m => MoveIsCheckmate(board, m)).ToArray();
@@ -43,15 +44,17 @@ namespace ChessChallenge.Example
 
             //Prioritize Checks
             Move[] checks = allMoves.Where(m => MoveIsCheck(board, m) && !MoveCreatesTarget(board, m)).ToArray();
-            if (checks.Length > 0)
+            if (checks.Length > 0 && board.GetAllPieceLists().Sum(p => p.Count) > 10)
                 return checks[rng.Next(checks.Length)];
 
+            float bestMove = float.MinValue;
             // Order moves from best to worst to improve pruning performance
             foreach (Move move in allMoves.OrderByDescending(m => CalculateMoveValue(board,m)))
             {
+                paths++;
                 board.MakeMove(move);
 
-                float score = -MinMax(board, depth, float.MinValue, float.MaxValue);
+                float score = -NegaMax(board, depth, float.MinValue, float.MaxValue);
 
                 if (score > bestMove)
                 {
@@ -60,26 +63,46 @@ namespace ChessChallenge.Example
                 }
                 board.UndoMove(move);
             }
+            Console.WriteLine($"Checked {paths:n0} paths");
             return  moveToPlay;
         }
        
-        int GetPiecevalue(PieceType pieceType)
-        {
-            return pieceValues[(int)pieceType];
-        }
 
-        int GetColorPiecevalue(Board board, bool isWhite)
-        {
-            return board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == isWhite).Select(pl => pl.Count * GetPiecevalue(pl.TypeOfPieceInList)).Sum();
-        }
+        /*
+         *  materialScore = kingWt  * (wK-bK)
+              + queenWt * (wQ-bQ)
+              + rookWt  * (wR-bR)
+              + knightWt* (wN-bN)
+              + bishopWt* (wB-bB)
+              + pawnWt  * (wP-bP)
+
+            mobilityScore = mobilityWt * (wMobility-bMobility)
+            return the score relative to the side to move (who2Move = +1 for white, -1 for black):
+
+            Eval  = (materialScore + mobilityScore) * who2Move
+         
+         */
 
         float CalculateBoardValue(Board board) 
         {
-            return GetColorPiecevalue(board, true) - GetColorPiecevalue(board, false) * (board.IsWhiteToMove ? 1 : -1);
+            float matWeight = 2f;
+            float moblWeight = 1f;
+
+            float materialScore = GetColorPiecevalue(board, true) - GetColorPiecevalue(board, false);
+            float mobilityScore = 0f;
+            if (board.TrySkipTurn())
+            {
+                mobilityScore = board.GetLegalMoves().Count();
+                mobilityScore -= board.GetLegalMoves().Count();
+                board.UndoSkipTurn();
+            }
+
+            return ((materialScore * matWeight) + (mobilityScore * moblWeight) )  * (board.IsWhiteToMove ? 1f : -1f);
         }
 
-        float MinMax(Board board, int depth, float alpha, float beta)
+        float NegaMax(Board board, int depth, float alpha, float beta)
         {
+            paths++;
             if(depth == 0 || board.IsInCheckmate())
                 return CalculateBoardValue(board);
 
@@ -88,7 +111,7 @@ namespace ChessChallenge.Example
             foreach(Move move in board.GetLegalMoves().OrderByDescending(m => CalculateMoveValue(board, m)))
             {
                 board.MakeMove(move);
-                max = Math.Max(-MinMax(board, depth - 1, -beta, -alpha), max);
+                max = Math.Max(-NegaMax(board, depth - 1, -beta, -alpha), max);
                 alpha = Math.Max(alpha, max);
                 board.UndoMove(move);
                 if(alpha >= beta)
@@ -135,5 +158,15 @@ namespace ChessChallenge.Example
             board.UndoMove(move);
             return isCheck;
         }
+        int GetPiecevalue(PieceType pieceType)
+        {
+            return pieceValues[(int)pieceType];
+        }
+
+        int GetColorPiecevalue(Board board, bool isWhite)
+        {
+            return board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == isWhite).Select(pl => pl.Count * GetPiecevalue(pl.TypeOfPieceInList)).Sum();
+        }
+
     }
 }
