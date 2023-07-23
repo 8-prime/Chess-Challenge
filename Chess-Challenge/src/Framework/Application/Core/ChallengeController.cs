@@ -229,8 +229,7 @@ namespace ChessChallenge.Application
                 {
                     moveToPlay = chosenMove;
                     isWaitingToPlayMove = true;
-                    const float minDelay = 0.1f;
-                    playMoveTime = lastMoveMadeTime + minDelay;
+                    playMoveTime = lastMoveMadeTime + MinMoveDelay;
                 }
                 else
                 {
@@ -294,7 +293,7 @@ namespace ChessChallenge.Application
                     if (botMatchGameIndex < numGamesToPlay && autoStartNextBotMatch)
                     {
                         botAPlaysWhite = !botAPlaysWhite;
-                        const int startNextGameDelayMs = 600;
+                        const int startNextGameDelayMs = 10000;
                         System.Timers.Timer autoNextTimer = new(startNextGameDelayMs);
                         int originalGameID = gameID;
                         autoNextTimer.Elapsed += (s, e) => AutoStartNextBotMatchGame(originalGameID, autoNextTimer);
